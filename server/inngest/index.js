@@ -1,6 +1,6 @@
 import { Inngest } from "inngest";
 import User from "../models/User.js";
-import connectDB from "../config/db.js"; // sửa path đúng theo project của bạn
+import connectDB from "../configs/db.js"; // sửa path đúng theo project của bạn
 
 export const inngest = new Inngest({ id: "my-MXH" });
 
