@@ -17,9 +17,11 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "imagekit": "^6.0.0",
     "inngest": "^3.52.6",
     "mongoose": "^9.2.4",
-    "multer": "^2.1.1"
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
