@@ -1,65 +1,101 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { dummyStoriesData } from "../assets/assets";
 import { Plus } from "lucide-react";
 import moment from "moment";
-import StoryModel from "./StoryModel";
+import CreateStory from "./CreateStory";
+import { AppContext } from "../context/AppContext";
 import StoryViewer from "./StoryViewer";
+import toast from "react-hot-toast";
+import { useAuth } from "@clerk/clerk-react";
+import { api } from "../api/axios.js";
+
 const StoriesBar = () => {
+  const { createStory, setCreateStory, storyViewer, setStoryViewer } =
+    useContext(AppContext);
   const [stories, setStories] = useState([]);
-  const [showModel, setShowModel] = useState(false);
-  const [viewStory, setViewStory] = useState(null);
+  const [activeStory, setActiveStory] = useState(null); // store clicked story
+  const { getToken } = useAuth();
+
+  //fetch stories
   const fetchStories = async () => {
-    setStories(dummyStoriesData);
+    try {
+      const token = await getToken();
+      const { data } = await api.get("/api/story/get", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (data.success) {
+        setStories(data.stories);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
+
   useEffect(() => {
     fetchStories();
+    console.log(stories);
   }, []);
+
   return (
-    <div className="w-screen sm:w=[calc(100vw-240px)] lg:max-w-2xl no-scrollbar overflow-x-auto px-4">
-      <div className="flex gap-4 pb-5">
-        {/*Add story */}
+    <>
+      {createStory && <CreateStory />}
+      {storyViewer && activeStory && <StoryViewer story={activeStory} />}
+
+      <div className="w-screen sm:w-[calc(100vw-240px)] lg:max-w-2xl overflow-x-auto px-4 flex gap-4">
+        {/*---- Add Story ------ */}
         <div
-          onClick={() => setShowModel(true)}
-          className="rounded-lg shadow-sm min-w-30 max-w-30 max-h-40 aspect-[3/4] cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-dashed border-indigo-300 bg-gradient-to-b from-indigo-50 to-white"
+          className="flex-shrink-0 w-[120px] h-[160px] rounded-md border border-dashed flex flex-col items-center justify-center gap-3
+          hover:shadow-lg transition-all duration-200 border-indigo-300 bg-gradient-to-b from-indigo-50 to-white"
         >
-          <div className="h-full flex flex-col items-center justify-center p-4">
-            <div className="size-10 bg-indigo-500 rounded-full flex items-center justify-center mb-3">
-              <Plus className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm font-medium text-slate-700 text-center">
-              Create Story
-            </p>
+          <div className="rounded-full bg-[#615FFF] p-2 flex items-center justify-center">
+            <Plus
+              onClick={() => setCreateStory(true)}
+              className="text-white transition-all duration-250 hover:scale-110 cursor-pointer"
+            />
           </div>
+          <p className="text-sm">Create Story</p>
         </div>
-        {/*Stories */}
-        {stories.map((story, index) => (
+
+        {/*------ Story Cards ------*/}
+        {stories.map((itm, index) => (
           <div
-            onClick={() => setViewStory(story)}
             key={index}
-            className={`relative rounded-lg shadow min-w-30 max-w-30 max-h-40 cursor-pointer hover:shadow-lg transition-all duration-200 bg-gradient-to-b from-indigo-500 to-purple-600hover:from-indigo-700 hover:to-purple-800 active:scale-95`}
+            onClick={() => {
+              setActiveStory(itm); // set the clicked story
+              setStoryViewer(true); // open viewer
+            }}
+            className="flex-shrink-0 relative w-[120px] h-[160px] rounded-lg shadow cursor-pointer
+              hover:shadow-lg transition-all duration-200 bg-gradient-to-b from-indigo-500 to-purple-600 
+              hover:from-indigo-700 hover:to-purple-600 active:scale-95 overflow-hidden"
           >
+            {/* User profile picture */}
             <img
-              src={story.user.profile_picture}
-              alt=""
+              src={itm.user.profile_picture}
+              alt="user"
               className="absolute size-8 top-3 left-3 z-10 rounded-full ring ring-gray-100 shadow"
             />
-            <p className="absolute top-18 left-3 text-white/60 text-sm truncate max-w-24">
-              {story.content}
+            {/* Story text */}
+            <p className="absolute bottom-16 left-3 text-white/90 text-sm truncate max-w-[90px]">
+              {itm.content}
             </p>
-            <p className="text-white absolute bottom-1 right-2 z-10 text-xs">
-              {moment(story.createdAt).fromNow()}
+            {/* Created time */}
+            <p className="absolute text-white bottom-1 left-2 z-10 text-xs">
+              {moment(itm.createdAt).fromNow()}
             </p>
-            {story.media_type !== "text" && (
-              <div className="absolute inset-0 z-1 rounded-lg bg-black overflow-">
-                {story.media_type == "image" ? (
+
+            {itm.media_type !== "text" && (
+              <div className="absolute inset-0 z-1 rounded-lg bg-black overflow-hidden">
+                {itm.media_type === "image" ? (
                   <img
-                    src={story.media_url}
                     className="h-full w-full object-cover hover:scale-110 transition duration-500 opacity-70 hover:opacity-80"
+                    src={itm.media_url}
                   />
                 ) : (
                   <video
-                    src={story.media_url}
                     className="h-full w-full object-cover hover:scale-110 transition duration-500 opacity-70 hover:opacity-80"
+                    src={itm.media_url}
                   />
                 )}
               </div>
@@ -67,15 +103,7 @@ const StoriesBar = () => {
           </div>
         ))}
       </div>
-      {/*Add story model*/}
-      {showModel && (
-        <StoryModel setShowModel={setShowModel} fetchStories={fetchStories} />
-      )}
-      {/* view story model */}
-      {viewStory && (
-        <StoryViewer viewStory={viewStory} setViewStory={setViewStory} />
-      )}
-    </div>
+    </>
   );
 };
 

@@ -1,127 +1,219 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
-  Users,
-  UserPlus,
-  UserCheck,
-  UserRoundPen,
   MessageSquare,
+  UserCheck,
+  UserPen,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import {
-  dummyConnectionsData as connections,
-  dummyFollowingData as following,
-  dummyFollowersData as followers,
-  dummyPendingConnectionsData as pendingConnections,
-} from "../assets/assets";
+import { useAuth } from "@clerk/clerk-react";
+import { toast } from "react-hot-toast";
+import { api } from "../api/axios.js";
+
 const Connections = () => {
-  const [currentTab, setCurrentTab] = useState("Followers");
+  const { getToken } = useAuth();
   const navigate = useNavigate();
+
+  const [connections, setConnections] = useState([]);
+  const [pendingConnections, setPendingConnections] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+  const [selectedList, setSelectedList] = useState("Followers");
+
+  // fetch connections on mount
+  useEffect(() => {
+    async function fetchConnections() {
+      try {
+        const token = await getToken();
+        const { data } = await api.get("/api/user/connections", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (data.success) {
+          setConnections(data.connections || []);
+          setPendingConnections(data.pendingConnections || []);
+          setFollowers(data.followers || []);
+          setFollowing(data.following || []);
+        } else {
+          toast.error(data.message || "Failed to fetch connections");
+        }
+      } catch (error) {
+        toast.error(error.message);
+      }
+    }
+
+    fetchConnections();
+  }, [getToken]);
+
   const dataArray = [
-    { label: "Followers", value: followers, icon: Users },
-    { label: "Following", value: following, icon: UserCheck },
+    { label: "Followers", value: followers, icon: <Users size={14} /> },
+    { label: "Following", value: following, icon: <UserCheck size={14} /> },
     {
       label: "Pending",
       value: pendingConnections,
-      icon: UserRoundPen,
+      icon: <UserPen size={14} />,
     },
-    { label: "Connections", value: connections, icon: UserPlus },
+    { label: "Connections", value: connections, icon: <UserPlus size={14} /> },
   ];
+
+  const handleUnfollow = async (userId) => {
+    try {
+      const token = await getToken();
+      const { data } = await api.post(
+        "/api/user/unfollow",
+        { id: userId },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (data.success) {
+        toast.success(data.message);
+        setFollowing((prev) => prev.filter((u) => u._id !== userId));
+      } else {
+        toast.error(data.message || "Failed to unfollow");
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const acceptConnection = async (userId) => {
+    try {
+      const token = await getToken();
+      const { data } = await api.post(
+        "/api/user/accept",
+        { id: userId },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+
+        // remove from pending
+        setPendingConnections((prev) => prev.filter((u) => u._id !== userId));
+
+        // add to connections
+        if (data.acceptedUser) {
+          setConnections((prev) => [...prev, data.acceptedUser]);
+        }
+      } else {
+        toast.error(data.message || "Failed to accept connection");
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto p-6">
-        {/* title */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Connections
-          </h1>
-          <p className="text-slate-600">
-            Manage your network and discover new connections
-          </p>
-        </div>
-        {/* counts */}
-        <div className="mb-8 flex flex-wrap gap-6">
-          {dataArray.map((item, index) => (
+    <motion.div
+      initial={{ opacity: 0, y: 150 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.5 }}
+      className="min-h-screen sm:w-[100%] w-[100vw] relative sm:pl-10 pb-10"
+    >
+      <p className="font-bold text-4xl sm:text-5xl mt-10">Connections</p>
+      <p className="text-sm sm:text-lg mt-[-1px] text-[#45556C]">
+        Manage your network and discover new connections
+      </p>
+
+      {/* Summary boxes */}
+      <div className="w-[90%] sm:w-full flex flex-wrap items-center justify-start gap-6 mt-18">
+        {dataArray.map((itm, idx) => (
+          <motion.div
+            key={idx}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setSelectedList(itm.label)}
+            className="bg-white rounded-sm shadow-lg h-22 w-45 sm:w-40 flex flex-col items-center justify-center gap-1 cursor-pointer"
+          >
+            <p className="font-bold">{itm.value?.length || 0}</p>
+            <p className="text-[#45556C]">{itm.label}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div className="sm:w-[50%] w-[80%] bg-white flex items-center flex-wrap justify-start rounded-sm shadow-lg mt-10 py-2 px-2 gap-6">
+        {dataArray.map((itm, idx) => (
+          <div
+            key={idx}
+            onClick={() => setSelectedList(itm.label)}
+            className={`cursor-pointer flex items-center gap-2 ${
+              selectedList === itm.label ? "text-black" : "text-gray-400/90"
+            }`}
+          >
+            <span className="text-xs">{itm.icon}</span>
+            <p className="text-sm font-semibold">{itm.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* List */}
+      <div className="mt-12 flex flex-wrap w-[90%] sm:w-[100%] gap-4">
+        {dataArray
+          .find((itm) => itm.label === selectedList)
+          ?.value?.map((item) => (
             <div
-              key={index}
-              className="flex flex-col items-center justify-center gap-1 border h-20 w-40 border-gray-200 bg-white shadow rounded-md"
+              key={item._id}
+              className="flex items-start justify-start shadow rounded-sm bg-white gap-2 py-3 px-5 w-[100%] sm:w-80 min-h-40"
             >
-              <b>{item.value.length}</b>
-              <p className="text-slate-600">{item.label}</p>
-            </div>
-          ))}
-        </div>
-        {/* Tabs */}
-        <div className="inline-flex flex-wrap items-center border border-gray-200 rounded-md p-1 bg-white shadow-sm">
-          {dataArray.map((tab) => (
-            <button
-              onClick={() => setCurrentTab(tab.label)}
-              key={tab.label}
-              className={`cursor-pointer flex items-center px-3 py-1 text-sm rounded-md transition-color ${currentTab === tab.label ? "bg-white font-medium text-black" : "text-gray-500 hover:text-black"}`}
-            >
-              <tab.icon className="w-4 h-4" />
-              <span className="ml-1">{tab.label}</span>
-              {tab.count !== undefined && (
-                <span className="ml-2 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* Connections */}
-        <div className="flex flex-wrap gap-6 mt-6">
-          {dataArray
-            .find((item) => item.label === currentTab)
-            .value.map((user) => (
-              <div
-                key={user._id}
-                className="w-full max-w-88 flex gap-5 p-6 bg-white shadow rounded-md"
-              >
-                <img
-                  src={user.profile_picture}
-                  alt=""
-                  className="rounded-full w-12 h-12 shadow-md mx-auto"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-slate-700">{user.full_name}</p>
-                  <p className="text-slate-500">@{user.username}</p>
-                  <p className="text-sm text-gray-600">
-                    {user.bio.slice(0, 30)}...
-                  </p>
-                  <div className="flex max-sm:flex-col gap-2 mt-4">
-                    {
-                      <button
-                        onClick={() => navigate(`/profile/${user._id}`)}
-                        className="w-full p-2 text-sm rounded bg-gradient-to-r from-indigo-500 to-purple-600 hove:from-indigo-600 hover:to-purple-700 active:scale-95 transition text-white cursor-pointer"
-                      >
-                        View Profile
-                      </button>
-                    }
-                    {currentTab === "Following" && (
-                      <button className="w-full p-2 text-sm rounded bg-slate-100 hover:bg-slate-200 text-black active:scale-95 transition cursor-pointer">
-                        Unfollow
-                      </button>
-                    )}
-                    {currentTab === "Pending" && (
-                      <button className="w-full p-2 text-sm rounded bg-slate-100 hover:bg-slate-200 text-black active:scale-95 transition cursor-pointer">
-                        Accept
-                      </button>
-                    )}
-                    {currentTab === "Connections" && (
-                      <button
-                        onClick={() => navigate(`/messages/${user._id}`)}
-                        className="w-full p-2 text-sm rounded bg-slate-100 hover:bg-slate-200 text-slate-800 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1"
-                      >
-                        <MessageSquare className="w-4 h-4" /> Message
-                      </button>
-                    )}
-                  </div>
+              <img
+                className="w-10 h-10 rounded-full"
+                src={item.profile_picture}
+                alt="profile"
+              />
+              <div className="w-full flex flex-col items-start gap-1">
+                <p className="text-sm font-semibold">{item.full_name}</p>
+                <p className="text-sm text-[#62748E]">@{item.username}</p>
+                <p className="text-xs text-[#4A5565]">
+                  {item.bio?.slice(0, 90)}...
+                </p>
+
+                <div className="w-full flex items-center gap-2 mt-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate(`/profile/${item._id}`)}
+                    className="cursor-pointer text-sm w-full bg-gradient-to-r from-[#615FFF] to-[#9810FA] rounded-sm py-2 flex items-center justify-center text-white"
+                  >
+                    View Profile
+                  </motion.button>
+
+                  {selectedList === "Following" && (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleUnfollow(item._id)}
+                      className="cursor-pointer text-sm w-full bg-slate-200 rounded-sm py-2 flex items-center justify-center text-black"
+                    >
+                      Unfollow
+                    </motion.button>
+                  )}
+
+                  {selectedList === "Pending" && (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => acceptConnection(item._id)}
+                      className="cursor-pointer text-sm w-full bg-slate-200 rounded-sm py-2 flex items-center justify-center text-black"
+                    >
+                      Accept
+                    </motion.button>
+                  )}
+
+                  {selectedList === "Connections" && (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => navigate(`/messages/${item._id}`)}
+                      className="cursor-pointer text-sm w-full bg-slate-200 rounded-sm py-2 flex items-center justify-center text-black gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Message
+                    </motion.button>
+                  )}
                 </div>
               </div>
-            ))}
-        </div>
+            </div>
+          ))}
       </div>
-    </div>
+    </motion.div>
   );
 };
 

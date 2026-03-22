@@ -1,29 +1,46 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-import { dummyUserData } from "../assets/assets";
-import { Menu, X } from "lucide-react";
 import Loading from "../components/Loading";
+import { useAuth } from "@clerk/clerk-react";
+import { api } from "../api/axios.js";
+import { toast } from "react-hot-toast";
+
 const Layout = () => {
-  const user = dummyUserData;
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { getToken } = useAuth();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = await getToken(); // ✅ must await
+        const { data } = await api.get("/api/user/data", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (data.success) {
+          setUser(data.user);
+        } else {
+          toast.error(data.message || "Failed to load user");
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [getToken]); // ✅ only depends on getToken function
+
   return user ? (
-    <div className="w-full flex h-screen">
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <div className="flex-1 bg-slate-50">
+    <div className="w-full fixed inset-0 overflow-y-scroll overflow-x-scroll bg-slate-50 flex min-h-screen">
+      <div className="w-64 p-0">
+        <Sidebar />
+      </div>
+      <div className="relative flex-1 px-6 py-2">
         <Outlet />
       </div>
-      {sidebarOpen ? (
-        <X
-          className="absolute top-3 right-3 p-2 z-100 bg-white rounded-md shadow w-10 h-10 text-gray-600 sm:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      ) : (
-        <Menu
-          className="absolute top-3 right-3 p-2 z-100 bg-white rounded-md shadow w-10 h-10 text-gray-600 sm:hidden"
-          onClick={() => setSidebarOpen(true)}
-        />
-      )}
     </div>
   ) : (
     <Loading />
