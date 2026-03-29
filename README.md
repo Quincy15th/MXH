@@ -1,6 +1,6 @@
-Pingup – Social Media Application
+MXH – Social Media Application
 
-Pingup is a fullstack social media platform where users can connect, share posts, chat, and explore content. It provides a real-time, interactive, and user-friendly experience with features similar to modern social platforms.
+MXH is a fullstack social media platform where users can connect, share posts, chat, and explore content. It provides a real-time, interactive, and user-friendly experience with features similar to modern social platforms.
 
 🚀 Features
 
